@@ -18,7 +18,7 @@ class RGBHistogramRenderer:
     RETURN_NAMES = ("image",)
     FUNCTION = "view_histogram"
     OUTPUT_NODE = False
-    CATEGORY = "image/analysis"
+    CATEGORY = "Image Analysis"
 
     def view_histogram(self, image):
         try:
