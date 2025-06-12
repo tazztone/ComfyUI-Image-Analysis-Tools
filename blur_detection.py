@@ -1,4 +1,3 @@
-
 import numpy as np
 import cv2
 import torch
@@ -82,9 +81,11 @@ class BlurDetection:
                 with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmpfile:
                     plt.savefig(tmpfile.name, bbox_inches='tight', dpi=150)
                     plt.close(fig)
-                    blur_img = cv2.imread(tmpfile.name)
-                    blur_rgb = cv2.cvtColor(blur_img, cv2.COLOR_BGR2RGB)
-                    os.unlink(tmpfile.name)
+                    temp_path = tmpfile.name
+
+                blur_img = cv2.imread(temp_path)
+                blur_rgb = cv2.cvtColor(blur_img, cv2.COLOR_BGR2RGB)
+                os.unlink(temp_path)
 
                 blur_tensor = torch.from_numpy(blur_rgb.astype(np.float32) / 255.0).unsqueeze(0)
             else:
