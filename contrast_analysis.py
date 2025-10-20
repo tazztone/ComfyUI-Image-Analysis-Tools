@@ -45,7 +45,8 @@ class ContrastAnalysis:
                     if block.size == 0:
                         continue
                     if comparison_method == "Michelson":
-                        c = (block.max() - block.min()) / (block.max() + block.min() + 1e-6)
+                        max_val, min_val = float(block.max()), float(block.min())
+                        c = (max_val - min_val) / (max_val + min_val + 1e-6)
                     elif comparison_method == "RMS":
                         c = block.std()
                     elif comparison_method == "Weber":
@@ -57,7 +58,8 @@ class ContrastAnalysis:
 
         if method in ["Global", "Hybrid"]:
             if comparison_method == "Michelson":
-                global_contrast = (gray.max() - gray.min()) / (gray.max() + gray.min() + 1e-6)
+                max_val, min_val = float(gray.max()), float(gray.min())
+                global_contrast = (max_val - min_val) / (max_val + min_val + 1e-6)
             elif comparison_method == "RMS":
                 global_contrast = gray.std()
             elif comparison_method == "Weber":
