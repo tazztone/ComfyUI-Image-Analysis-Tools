@@ -1,37 +1,36 @@
-
 import numpy as np
 import cv2
 import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
+import comfy.io as io
 
-class EdgeDensityAnalysis:
+class EdgeDensityAnalysis(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "method": (["Canny", "Sobel"], {"default": "Canny"}),
-                "block_size": ("INT", {"default": 32, "min": 8, "max": 128, "step": 8}),
-                "visualize_edge_map": ("BOOLEAN", {"default": True})
-            }
-        }
+    def define_schema(cls):
+        return io.Schema({
+            "image": io.Image.Input(),
+            "method": io.Enum.Input(["Canny", "Sobel"], default="Canny"),
+            "block_size": io.Int.Input(default=32, min=8, max=128, step=8),
+            "visualize_edge_map": io.Boolean.Input(default=True)
+        })
 
     RETURN_TYPES = ("FLOAT", "IMAGE", "STRING", "IMAGE")
     RETURN_NAMES = ("edge_density_score", "edge_density_map", "interpretation", "edge_preview")
-    FUNCTION = "analyze"
+    FUNCTION = "execute"
     CATEGORY = "Image Analysis"
 
-    def analyze(self, image, method, block_size, visualize_edge_map):
+    @classmethod
+    def execute(cls, image, method, block_size, visualize_edge_map):
         try:
             img_tensor = image[0]
-            if img_tensor.ndim == 4:
-                img_tensor = img_tensor[0]
-            if img_tensor.ndim == 3 and img_tensor.shape[0] in [1, 3]:
-                np_img = img_tensor.cpu().numpy().transpose(1, 2, 0)
-            else:
-                np_img = img_tensor.cpu().numpy()
+            # Standard ComfyUI is [H, W, 3]
+            np_img = img_tensor.cpu().numpy()
+
+            # If accidentally CHW
+            if np_img.shape[0] == 3 and np_img.shape[2] > 3:
+                 np_img = np_img.transpose(1, 2, 0)
 
             uint8_img = (np.clip(np_img, 0, 1) * 255).astype(np.uint8)
             gray = cv2.cvtColor(uint8_img, cv2.COLOR_RGB2GRAY)
@@ -106,11 +105,3 @@ class EdgeDensityAnalysis:
             print(f"[EdgeDensityAnalysis] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
             return 0.0, fallback, "Error during processing", fallback
-
-NODE_CLASS_MAPPINGS = {
-    "Edge Density Analysis": EdgeDensityAnalysis
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "Edge Density Analysis": "Edge Density Analysis"
-}

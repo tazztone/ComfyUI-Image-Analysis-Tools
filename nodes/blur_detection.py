@@ -4,21 +4,20 @@ import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
+import comfy.io as io
 
-class BlurDetection:
+class BlurDetection(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "block_size": ("INT", {"default": 32, "min": 8, "max": 128, "step": 8}),
-                "visualize_blur_map": ("BOOLEAN", {"default": True})
-            }
-        }
+    def define_schema(cls):
+        return io.Schema({
+            "image": io.Image.Input(),
+            "block_size": io.Int.Input(default=32, min=8, max=128, step=8),
+            "visualize_blur_map": io.Boolean.Input(default=True)
+        })
 
     RETURN_TYPES = ("FLOAT", "IMAGE", "STRING")
     RETURN_NAMES = ("blur_score", "blur_map", "interpretation")
-    FUNCTION = "analyze"
+    FUNCTION = "execute"
     CATEGORY = "Image Analysis"
 
     def interpret_blur(self, score):
@@ -31,17 +30,19 @@ class BlurDetection:
         else:
             return f"Very sharp ({score:.1f})"
 
-    def analyze(self, image, block_size, visualize_blur_map):
+    @classmethod
+    def execute(cls, image, block_size, visualize_blur_map):
         try:
+            # ComfyUI image batches are [B, H, W, C]
             img_tensor = image[0]
-            if img_tensor.ndim == 4:
-                img_tensor = img_tensor[0]
-            if img_tensor.ndim == 3 and img_tensor.shape[0] in [1, 3]:
-                np_img = img_tensor.cpu().numpy().transpose(1, 2, 0)
-            elif img_tensor.ndim == 3 and img_tensor.shape[2] in [1, 3]:
-                np_img = img_tensor.cpu().numpy()
-            else:
-                raise ValueError(f"Unsupported image shape: {img_tensor.shape}")
+
+            # Check for standard [H, W, C] vs [C, H, W] ambiguity
+            # Standard ComfyUI is [H, W, 3]
+            np_img = img_tensor.cpu().numpy()
+
+            # If accidentally CHW (unlikely in standard pipeline but checking)
+            if np_img.shape[0] == 3 and np_img.shape[2] > 3:
+                 np_img = np_img.transpose(1, 2, 0)
 
             uint8_img = (np.clip(np_img, 0, 1) * 255).astype(np.uint8)
             gray = cv2.cvtColor(uint8_img, cv2.COLOR_RGB2GRAY)
@@ -62,7 +63,11 @@ class BlurDetection:
                     scores.append(var)
 
             global_score = float(np.mean(scores))
-            interpretation = self.interpret_blur(global_score)
+
+            # Use instance method? execute is classmethod in V3 guideline,
+            # so we must create instance or make helper static.
+            # However, the interpret_blur method doesn't use self state.
+            interpretation = cls().interpret_blur(global_score)
 
             if visualize_blur_map:
                 vis_up = cv2.resize(blur_map, (w, h), interpolation=cv2.INTER_NEAREST)
@@ -97,11 +102,3 @@ class BlurDetection:
             print(f"[BlurDetection] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
             return 0.0, fallback, "Error during processing"
-
-NODE_CLASS_MAPPINGS = {
-    "Blur Detection": BlurDetection
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "Blur Detection": "Blur Detection"
-}

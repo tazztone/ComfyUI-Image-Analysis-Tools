@@ -1,29 +1,42 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 import io
 import torch
+import comfy.io as io_comfy # Rename to avoid conflict with io module
 
-class RGBHistogramRenderer:
+class RGBHistogramRenderer(io_comfy.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-            }
-        }
+    def define_schema(cls):
+        return io_comfy.Schema({
+            "image": io_comfy.Image.Input(),
+        })
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "view_histogram"
+    FUNCTION = "execute"
     OUTPUT_NODE = False
     CATEGORY = "Image Analysis"
 
-    def view_histogram(self, image):
+    @classmethod
+    def execute(cls, image):
         try:
-            # Convert tensor to numpy HWC
-            np_img = image[0].cpu().numpy().transpose(1, 2, 0)  # CHW → HWC
+            # ComfyUI image batches are [B, H, W, C]
+            img_tensor = image[0]
+
+            np_img = img_tensor.cpu().numpy()
+
+            # The original code had: np_img = image[0].cpu().numpy().transpose(1, 2, 0)
+            # This assumed input was CHW, but ComfyUI usually passes HWC for IMAGE type.
+            # We fix it by removing transpose if it's already HWC.
+
+            # Check dimensions to be safe
+            if np_img.ndim == 3:
+                # If shape is [3, H, W], transpose to [H, W, 3]
+                if np_img.shape[0] == 3 and np_img.shape[2] > 3:
+                     np_img = np_img.transpose(1, 2, 0)
+                # Else assume [H, W, 3] - correct for ComfyUI
+
             red = np_img[:, :, 0]
             green = np_img[:, :, 1]
             blue = np_img[:, :, 2]
@@ -54,7 +67,3 @@ class RGBHistogramRenderer:
             print(f"[RGBHistogramInlineViewer] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
             return (fallback,)
-
-NODE_CLASS_MAPPINGS = {
-    "RGB Histogram Renderer": RGBHistogramRenderer
-}

@@ -1,38 +1,35 @@
-
 import numpy as np
 import cv2
 import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
+import comfy.io as io
 
-class NoiseEstimation:
+class NoiseEstimation(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "block_size": ("INT", {"default": 32, "min": 8, "max": 128, "step": 8}),
-                "visualize_noise_map": ("BOOLEAN", {"default": True})
-            }
-        }
+    def define_schema(cls):
+        return io.Schema({
+            "image": io.Image.Input(),
+            "block_size": io.Int.Input(default=32, min=8, max=128, step=8),
+            "visualize_noise_map": io.Boolean.Input(default=True)
+        })
 
     RETURN_TYPES = ("FLOAT", "IMAGE")
     RETURN_NAMES = ("noise_score", "noise_map")
-    FUNCTION = "estimate"
+    FUNCTION = "execute"
     CATEGORY = "Image Analysis"
 
-    def estimate(self, image, block_size, visualize_noise_map):
+    @classmethod
+    def execute(cls, image, block_size, visualize_noise_map):
         try:
             img_tensor = image[0]
-            if img_tensor.ndim == 4:
-                img_tensor = img_tensor[0]
-            if img_tensor.ndim == 3 and img_tensor.shape[0] in [1, 3]:
-                np_img = img_tensor.cpu().numpy().transpose(1, 2, 0)
-            elif img_tensor.ndim == 3 and img_tensor.shape[2] in [1, 3]:
-                np_img = img_tensor.cpu().numpy()
-            else:
-                raise ValueError(f"Unsupported image shape: {img_tensor.shape}")
+            # Standard ComfyUI is [H, W, 3]
+            np_img = img_tensor.cpu().numpy()
+
+            # If accidentally CHW (unlikely in standard pipeline but checking)
+            if np_img.shape[0] == 3 and np_img.shape[2] > 3:
+                 np_img = np_img.transpose(1, 2, 0)
 
             uint8_img = (np.clip(np_img, 0, 1) * 255).astype(np.uint8)
             gray = cv2.cvtColor(uint8_img, cv2.COLOR_RGB2GRAY)
@@ -88,11 +85,3 @@ class NoiseEstimation:
             print(f"[NoiseEstimation] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
             return 0.0, fallback
-
-NODE_CLASS_MAPPINGS = {
-    "Noise Estimation": NoiseEstimation
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "Noise Estimation": "Noise Estimation"
-}

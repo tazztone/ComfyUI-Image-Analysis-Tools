@@ -1,4 +1,3 @@
-
 import numpy as np
 import cv2
 import torch
@@ -6,21 +5,20 @@ import matplotlib.pyplot as plt
 import tempfile
 import os
 from sklearn.cluster import KMeans
+import comfy.io as io
 
-class ColorHarmonyAnalyzer:
+class ColorHarmonyAnalyzer(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "num_clusters": ("INT", {"default": 3, "min": 2, "max": 8}),
-                "visualize_harmony": ("BOOLEAN", {"default": True}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema({
+            "image": io.Image.Input(),
+            "num_clusters": io.Int.Input(default=3, min=2, max=8),
+            "visualize_harmony": io.Boolean.Input(default=True),
+        })
 
     RETURN_TYPES = ("FLOAT", "STRING", "IMAGE")
     RETURN_NAMES = ("harmony_score", "harmony_type", "hue_wheel_visual")
-    FUNCTION = "analyze"
+    FUNCTION = "execute"
     CATEGORY = "Image Analysis"
 
     def hue_distance(self, h1, h2):
@@ -67,15 +65,16 @@ class ColorHarmonyAnalyzer:
             return best[0], best[1]
         return "No clear harmony", 0.0
 
-    def analyze(self, image, num_clusters, visualize_harmony):
+    @classmethod
+    def execute(cls, image, num_clusters, visualize_harmony):
         try:
             img_tensor = image[0]
-            if img_tensor.ndim == 4:
-                img_tensor = img_tensor[0]
+            # Standard ComfyUI is [H, W, 3]
             np_img = img_tensor.cpu().numpy()
 
-            if np_img.shape[0] in [1, 3]:
-                np_img = np.transpose(np_img, (1, 2, 0))
+            # If accidentally CHW (unlikely in standard pipeline but checking)
+            if np_img.shape[0] == 3 and np_img.shape[2] > 3:
+                 np_img = np_img.transpose(1, 2, 0)
 
             uint8_img = (np.clip(np_img, 0, 1) * 255).astype(np.uint8)
             if len(uint8_img.shape) == 2:
@@ -94,7 +93,8 @@ class ColorHarmonyAnalyzer:
             if not dominant_hues:
                 return 0.0, "No dominant hues found", torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
-            harmony_type, score = self.match_harmony(dominant_hues)
+            # Use helper methods
+            harmony_type, score = cls().match_harmony(dominant_hues)
 
             if visualize_harmony:
                 fig, ax = plt.subplots(figsize=(5, 5), subplot_kw={'projection': 'polar'})
@@ -124,11 +124,3 @@ class ColorHarmonyAnalyzer:
             print(f"[ColorHarmonyAnalyzer] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
             return 0.0, "Error during processing", fallback
-
-NODE_CLASS_MAPPINGS = {
-    "Color Harmony Analyzer": ColorHarmonyAnalyzer
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "Color Harmony Analyzer": "Color Harmony Analyzer"
-}
