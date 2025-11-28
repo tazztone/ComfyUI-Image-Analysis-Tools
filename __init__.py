@@ -1,15 +1,15 @@
-from .rgb_histogram_renderer import RGBHistogramRenderer
-from .sharpness_focus_score import SharpnessFocusScore
-from .noise_estimation_basic import NoiseEstimation
-from .contrast_analysis import ContrastAnalysis
-from .entropy_analysis import EntropyAnalysis
-from .blur_detection import BlurDetection
-from .edge_density_analysis import EdgeDensityAnalysis
-from .clipping_analysis import ClippingAnalysis
-from .color_cast_detector import ColorCastDetector
-from .color_harmony_analyzer import ColorHarmonyAnalyzer
-from .color_temperature_estimator import ColorTemperatureEstimator
-from .defocus_analysis import DefocusAnalysis
+from .nodes.rgb_histogram_renderer import RGBHistogramRenderer
+from .nodes.sharpness_focus_score import SharpnessFocusScore
+from .nodes.noise_estimation_basic import NoiseEstimation
+from .nodes.contrast_analysis import ContrastAnalysis
+from .nodes.entropy_analysis import EntropyAnalysis
+from .nodes.blur_detection import BlurDetection
+from .nodes.edge_density_analysis import EdgeDensityAnalysis
+from .nodes.clipping_analysis import ClippingAnalysis
+from .nodes.color_cast_detector import ColorCastDetector
+from .nodes.color_harmony_analyzer import ColorHarmonyAnalyzer
+from .nodes.color_temperature_estimator import ColorTemperatureEstimator
+from .nodes.defocus_analysis import DefocusAnalysis
 
 NODE_CLASS_MAPPINGS = {
     "RGB Histogram Renderer": RGBHistogramRenderer,
@@ -42,4 +42,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
 
 }
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+WEB_DIRECTORY = "./web/js"
+
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

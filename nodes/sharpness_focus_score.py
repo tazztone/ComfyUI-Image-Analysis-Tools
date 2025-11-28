@@ -1,22 +1,20 @@
-
 import numpy as np
 import cv2
 import torch
+import comfy.io as io
 
-class SharpnessFocusScore:
+class SharpnessFocusScore(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "method": (["Laplacian", "Tenengrad", "Hybrid"], {"default": "Hybrid"}),
-                "visualize_edges": ("BOOLEAN", {"default": False}),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema({
+            "image": io.Image.Input(),
+            "method": io.Enum.Input(["Laplacian", "Tenengrad", "Hybrid"], default="Hybrid"),
+            "visualize_edges": io.Boolean.Input(default=False),
+        })
 
     RETURN_TYPES = ("FLOAT", "IMAGE", "STRING")
     RETURN_NAMES = ("sharpness_score", "edge_visualization", "interpretation")
-    FUNCTION = "calculate"
+    FUNCTION = "execute"
     CATEGORY = "Image Analysis"
 
     def interpret_score(self, score, method):
@@ -53,17 +51,16 @@ class SharpnessFocusScore:
         else:
             return "Unknown method"
 
-    def calculate(self, image, method, visualize_edges):
+    @classmethod
+    def execute(cls, image, method, visualize_edges):
         try:
             img_tensor = image[0]
-            if img_tensor.ndim == 4:
-                img_tensor = img_tensor[0]
-            if img_tensor.ndim == 3 and img_tensor.shape[0] in [1, 3]:
-                np_img = img_tensor.cpu().numpy().transpose(1, 2, 0)
-            elif img_tensor.ndim == 3 and img_tensor.shape[2] in [1, 3]:
-                np_img = img_tensor.cpu().numpy()
-            else:
-                raise ValueError(f"Unhandled image shape: {img_tensor.shape}")
+            # Standard ComfyUI is [H, W, 3]
+            np_img = img_tensor.cpu().numpy()
+
+            # If accidentally CHW (unlikely in standard pipeline but checking)
+            if np_img.shape[0] == 3 and np_img.shape[2] > 3:
+                 np_img = np_img.transpose(1, 2, 0)
 
             uint8_img = (np_img * 255).astype(np.uint8)
 
@@ -88,6 +85,8 @@ class SharpnessFocusScore:
             mag = np.sqrt(gx ** 2 + gy ** 2)
             ten_score = np.mean(mag ** 2)
 
+            instance = cls()
+
             if method == "Laplacian":
                 score = lap_score
                 edges = np.abs(lap)
@@ -110,18 +109,10 @@ class SharpnessFocusScore:
             else:
                 edge_tensor = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
-            interpretation = self.interpret_score(score, method)
+            interpretation = instance.interpret_score(score, method)
             return float(score), edge_tensor, interpretation
 
         except Exception as e:
             print(f"[SharpnessFocusScore] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
             return 0.0, fallback, "Error during processing"
-
-NODE_CLASS_MAPPINGS = {
-    "Sharpness / Focus Score": SharpnessFocusScore
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "Sharpness / Focus Score": "Sharpness / Focus Score"
-}

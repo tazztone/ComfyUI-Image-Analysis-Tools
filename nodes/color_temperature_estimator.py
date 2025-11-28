@@ -4,31 +4,28 @@ import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
+import comfy.io as io
 
-class ColorTemperatureEstimator:
+class ColorTemperatureEstimator(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {"required": {"image": ("IMAGE",)}}
+    def define_schema(cls):
+        return io.Schema({"image": io.Image.Input()})
 
     RETURN_TYPES = ("INT", "STRING", "IMAGE")
     RETURN_NAMES = ("kelvin", "temperature_label", "color_swatch")
-    FUNCTION = "estimate"
+    FUNCTION = "execute"
     CATEGORY = "Image Analysis/Color"
 
-    def estimate(self, image):
+    @classmethod
+    def execute(cls, image):
         img = image[0]
 
         # Normalize ComfyUI inputs to H×W×C float32 [0–1]
         if isinstance(img, torch.Tensor):
             arr = img.detach().cpu().numpy()
-            if arr.ndim == 4:            # [B, C, H, W] → drop batch
-                arr = arr[0]
-            if arr.ndim == 3 and arr.shape[0] in (1, 3):   # [C, H, W] → [H, W, C]
+            # If accidentally CHW
+            if arr.ndim == 3 and arr.shape[0] == 3 and arr.shape[2] > 3:
                 arr = arr.transpose(1, 2, 0)
-            elif arr.ndim == 3 and arr.shape[2] in (1, 3): # [H, W, C]
-                pass
-            else:
-                raise ValueError(f"Unsupported tensor shape: {arr.shape}")
         elif isinstance(img, np.ndarray) and img.ndim == 3:
             arr = img
         else:
@@ -38,7 +35,7 @@ class ColorTemperatureEstimator:
         img_uint8 = (arr * 255).astype(np.uint8)
 
         # Compute color temperature
-        kelvin, label, avg_rgb = self._estimate_color_temperature(img_uint8)
+        kelvin, label, avg_rgb = cls()._estimate_color_temperature(img_uint8)
 
         # — Build a 64×128 swatch via Matplotlib and save/load just like your working nodes —
         # Prepare figure matching your other nodes' pattern
@@ -86,11 +83,3 @@ class ColorTemperatureEstimator:
             lab = "Blueish / Overcast"
 
         return kelvin, lab, avg
-
-NODE_CLASS_MAPPINGS = {
-    "ColorTemperatureEstimator": ColorTemperatureEstimator
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ColorTemperatureEstimator": "Color Temperature Estimator"
-}

@@ -1,21 +1,17 @@
-
 import numpy as np
 import cv2
 import torch
+import comfy.io as io
 
-class DefocusAnalysis:
+class DefocusAnalysis(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "method": (["FFT Ratio (Sum)", "FFT Ratio (Mean)", "Hybrid (Mean+Sum)", "Edge Width"],),
-                "normalize": ("BOOLEAN", {"default": True}),
-            },
-            "optional": {
-                "edge_detector": (["Sobel", "Canny"],),
-            }
-        }
+    def define_schema(cls):
+        return io.Schema({
+            "image": io.Image.Input(),
+            "method": io.Enum.Input(["FFT Ratio (Sum)", "FFT Ratio (Mean)", "Hybrid (Mean+Sum)", "Edge Width"]),
+            "normalize": io.Boolean.Input(default=True),
+            "edge_detector": io.Enum.Input(["Sobel", "Canny"], default="Sobel", optional=True),
+        })
 
     RETURN_TYPES = ("FLOAT", "STRING", "IMAGE", "IMAGE")
     RETURN_NAMES = (
@@ -25,11 +21,17 @@ class DefocusAnalysis:
         "high_freq_mask"
     )
 
-    FUNCTION = "analyze"
+    FUNCTION = "execute"
     CATEGORY = "Image Analysis"
 
-    def analyze(self, image, method, normalize=True, edge_detector="Sobel"):
+    @classmethod
+    def execute(cls, image, method, normalize=True, edge_detector="Sobel"):
         image_np = image[0].cpu().numpy()
+
+        # If accidentally CHW
+        if image_np.ndim == 3 and image_np.shape[0] == 3 and image_np.shape[2] > 3:
+             image_np = image_np.transpose(1, 2, 0)
+
         image_np = (image_np * 255).astype(np.uint8)
         if image_np.shape[2] == 4:
             image_np = image_np[:, :, :3]
@@ -39,15 +41,17 @@ class DefocusAnalysis:
         fft_vis = np.zeros((64, 64, 3), dtype=np.uint8)
         mask_vis = np.zeros((64, 64, 3), dtype=np.uint8)
 
+        instance = cls()
+
         if "FFT" in method or method.startswith("Hybrid"):
-            score, fft_vis, mask_vis = self.fft_analysis(gray, method)
+            score, fft_vis, mask_vis = instance.fft_analysis(gray, method)
         elif method == "Edge Width":
-            score, fft_vis, mask_vis = self.edge_width_analysis(gray, edge_detector)
+            score, fft_vis, mask_vis = instance.edge_width_analysis(gray, edge_detector)
 
         if normalize:
             score = max(0.0, min(score, 1.0))
 
-        interpretation = self.interpret(score)
+        interpretation = instance.interpret(score)
 
         fft_tensor = torch.from_numpy(cv2.cvtColor(fft_vis, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0).unsqueeze(0)
         mask_tensor = torch.from_numpy(mask_vis.astype(np.float32) / 255.0).unsqueeze(0)

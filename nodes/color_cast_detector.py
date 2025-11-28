@@ -1,37 +1,36 @@
-
 import numpy as np
 import cv2
 import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
+import comfy.io as io
 
-class ColorCastDetector:
+class ColorCastDetector(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "tolerance": ("FLOAT", {"default": 0.05, "min": 0.01, "max": 0.5, "step": 0.01}),
-                "visualize_color_bias": ("BOOLEAN", {"default": True}),
-                "visualization_mode": (["Channel Difference", "Neutrality Deviation"],)
-            }
-        }
+    def define_schema(cls):
+        return io.Schema({
+            "image": io.Image.Input(),
+            "tolerance": io.Float.Input(default=0.05, min=0.01, max=0.5, step=0.01),
+            "visualize_color_bias": io.Boolean.Input(default=True),
+            "visualization_mode": io.Enum.Input(["Channel Difference", "Neutrality Deviation"])
+        })
 
     RETURN_TYPES = ("FLOAT", "IMAGE", "STRING")
     RETURN_NAMES = ("cast_score", "color_bias_map", "interpretation")
-    FUNCTION = "analyze"
+    FUNCTION = "execute"
     CATEGORY = "Image Analysis"
 
-    def analyze(self, image, tolerance, visualize_color_bias, visualization_mode):
+    @classmethod
+    def execute(cls, image, tolerance, visualize_color_bias, visualization_mode):
         try:
             img_tensor = image[0]
-            if img_tensor.ndim == 4:
-                img_tensor = img_tensor[0]
-            if img_tensor.ndim == 3 and img_tensor.shape[0] in [1, 3]:
-                np_img = img_tensor.cpu().numpy().transpose(1, 2, 0)
-            else:
-                np_img = img_tensor.cpu().numpy()
+            # Standard ComfyUI is [H, W, 3]
+            np_img = img_tensor.cpu().numpy()
+
+            # If accidentally CHW (unlikely in standard pipeline but checking)
+            if np_img.shape[0] == 3 and np_img.shape[2] > 3:
+                 np_img = np_img.transpose(1, 2, 0)
 
             uint8_img = (np.clip(np_img, 0, 1) * 255).astype(np.uint8)
             mean_rgb = np.mean(uint8_img.reshape(-1, 3), axis=0)
@@ -97,11 +96,3 @@ class ColorCastDetector:
             print(f"[ColorCastDetector] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
             return 0.0, fallback, "Error during processing"
-
-NODE_CLASS_MAPPINGS = {
-    "Color Cast Detector": ColorCastDetector
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "Color Cast Detector": "Color Cast Detector"
-}
