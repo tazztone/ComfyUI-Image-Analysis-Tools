@@ -4,21 +4,26 @@ import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
-import comfy.io as io
+from comfy_api.latest import io
 
 class EntropyAnalysis(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({
-            "image": io.Image.Input(),
-            "block_size": io.Int.Input(default=32, min=8, max=128, step=8),
-            "visualize_entropy_map": io.Boolean.Input(default=True)
-        })
-
-    RETURN_TYPES = ("FLOAT", "IMAGE", "STRING")
-    RETURN_NAMES = ("entropy_score", "entropy_map", "interpretation")
-    FUNCTION = "execute"
-    CATEGORY = "Image Analysis"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="Entropy Analysis",
+            display_name="Entropy Analysis",
+            category="Image Analysis",
+            inputs=[
+                io.Image.Input("image"),
+                io.Int.Input("block_size", default=32, min=8, max=128),
+                io.Boolean.Input("visualize_entropy_map", default=True)
+            ],
+            outputs=[
+                io.Float.Output("entropy_score"),
+                io.Image.Output("entropy_map"),
+                io.String.Output("interpretation")
+            ]
+        )
 
     def compute_entropy(self, block):
         hist = cv2.calcHist([block], [0], None, [256], [0, 256])
@@ -98,9 +103,9 @@ class EntropyAnalysis(io.ComfyNode):
             else:
                 entropy_tensor = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
-            return global_entropy, entropy_tensor, interpretation
+            return io.NodeOutput(global_entropy, entropy_tensor, interpretation)
 
         except Exception as e:
             print(f"[EntropyAnalysis] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
-            return 0.0, fallback, "Error during processing"
+            return io.NodeOutput(0.0, fallback, "Error during processing")

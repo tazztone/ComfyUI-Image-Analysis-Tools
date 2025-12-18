@@ -5,21 +5,26 @@ import matplotlib.pyplot as plt
 import tempfile
 import os
 from sklearn.cluster import KMeans
-import comfy.io as io
+from comfy_api.latest import io
 
 class ColorHarmonyAnalyzer(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({
-            "image": io.Image.Input(),
-            "num_clusters": io.Int.Input(default=3, min=2, max=8),
-            "visualize_harmony": io.Boolean.Input(default=True),
-        })
-
-    RETURN_TYPES = ("FLOAT", "STRING", "IMAGE")
-    RETURN_NAMES = ("harmony_score", "harmony_type", "hue_wheel_visual")
-    FUNCTION = "execute"
-    CATEGORY = "Image Analysis"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="Color Harmony Analyzer",
+            display_name="Color Harmony Analyzer",
+            category="Image Analysis",
+            inputs=[
+                io.Image.Input("image"),
+                io.Int.Input("num_clusters", default=3, min=2, max=8),
+                io.Boolean.Input("visualize_harmony", default=True),
+            ],
+            outputs=[
+                io.Float.Output("harmony_score"),
+                io.String.Output("harmony_type"),
+                io.Image.Output("hue_wheel_visual"),
+            ]
+        )
 
     def hue_distance(self, h1, h2):
         return min(abs(h1 - h2), 180 - abs(h1 - h2))
@@ -118,9 +123,9 @@ class ColorHarmonyAnalyzer(io.ComfyNode):
             else:
                 vis_tensor = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
-            return float(score), harmony_type, vis_tensor
+            return io.NodeOutput(float(score), harmony_type, vis_tensor)
 
         except Exception as e:
             print(f"[ColorHarmonyAnalyzer] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
-            return 0.0, "Error during processing", fallback
+            return io.NodeOutput(0.0, "Error during processing", fallback)

@@ -4,22 +4,27 @@ import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
-import comfy.io as io
+from comfy_api.latest import io
 
 class ClippingAnalysis(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({
-            "image": io.Image.Input(),
-            "mode": io.Enum.Input(["Highlight/Shadow Clipping", "Saturation Clipping"]),
-            "threshold": io.Int.Input(default=5, min=1, max=50, step=1),
-            "visualize_clipping_map": io.Boolean.Input(default=True)
-        })
-
-    RETURN_TYPES = ("FLOAT", "IMAGE", "STRING")
-    RETURN_NAMES = ("clipping_score", "clipping_map", "interpretation")
-    FUNCTION = "execute"
-    CATEGORY = "Image Analysis"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="Clipping Analysis",
+            display_name="Clipping Analysis",
+            category="Image Analysis",
+            inputs=[
+                io.Image.Input("image"),
+                io.Enum.Input("mode", ["Highlight/Shadow Clipping", "Saturation Clipping"]),
+                io.Int.Input("threshold", default=5, min=1, max=50),
+                io.Boolean.Input("visualize_clipping_map", default=True)
+            ],
+            outputs=[
+                io.Float.Output("clipping_score"),
+                io.Image.Output("clipping_map"),
+                io.String.Output("interpretation")
+            ]
+        )
 
     @classmethod
     def execute(cls, image, mode, threshold, visualize_clipping_map):
@@ -74,9 +79,9 @@ class ClippingAnalysis(io.ComfyNode):
             else:
                 map_tensor = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
-            return float(score), map_tensor, description
+            return io.NodeOutput(float(score), map_tensor, description)
 
         except Exception as e:
             print(f"[ClippingAnalysis] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
-            return 0.0, fallback, "Error during processing"
+            return io.NodeOutput(0.0, fallback, "Error during processing")

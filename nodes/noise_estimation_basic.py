@@ -4,21 +4,25 @@ import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
-import comfy.io as io
+from comfy_api.latest import io
 
 class NoiseEstimation(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({
-            "image": io.Image.Input(),
-            "block_size": io.Int.Input(default=32, min=8, max=128, step=8),
-            "visualize_noise_map": io.Boolean.Input(default=True)
-        })
-
-    RETURN_TYPES = ("FLOAT", "IMAGE")
-    RETURN_NAMES = ("noise_score", "noise_map")
-    FUNCTION = "execute"
-    CATEGORY = "Image Analysis"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="Noise Estimation",
+            display_name="Noise Estimation",
+            category="Image Analysis",
+            inputs=[
+                io.Image.Input("image"),
+                io.Int.Input("block_size", default=32, min=8, max=128),
+                io.Boolean.Input("visualize_noise_map", default=True)
+            ],
+            outputs=[
+                io.Float.Output("noise_score"),
+                io.Image.Output("noise_map")
+            ]
+        )
 
     @classmethod
     def execute(cls, image, block_size, visualize_noise_map):
@@ -79,9 +83,9 @@ class NoiseEstimation(io.ComfyNode):
             else:
                 noise_tensor = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
-            return global_score, noise_tensor
+            return io.NodeOutput(global_score, noise_tensor)
 
         except Exception as e:
             print(f"[NoiseEstimation] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
-            return 0.0, fallback
+            return io.NodeOutput(0.0, fallback)

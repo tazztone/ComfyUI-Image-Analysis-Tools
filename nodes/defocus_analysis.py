@@ -1,28 +1,28 @@
 import numpy as np
 import cv2
 import torch
-import comfy.io as io
+from comfy_api.latest import io
 
 class DefocusAnalysis(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({
-            "image": io.Image.Input(),
-            "method": io.Enum.Input(["FFT Ratio (Sum)", "FFT Ratio (Mean)", "Hybrid (Mean+Sum)", "Edge Width"]),
-            "normalize": io.Boolean.Input(default=True),
-            "edge_detector": io.Enum.Input(["Sobel", "Canny"], default="Sobel", optional=True),
-        })
-
-    RETURN_TYPES = ("FLOAT", "STRING", "IMAGE", "IMAGE")
-    RETURN_NAMES = (
-        "defocus_score",
-        "interpretation",
-        "fft_heatmap",
-        "high_freq_mask"
-    )
-
-    FUNCTION = "execute"
-    CATEGORY = "Image Analysis"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="Defocus Analysis",
+            display_name="Defocus Analysis",
+            category="Image Analysis",
+            inputs=[
+                io.Image.Input("image"),
+                io.Enum.Input("method", ["FFT Ratio (Sum)", "FFT Ratio (Mean)", "Hybrid (Mean+Sum)", "Edge Width"]),
+                io.Boolean.Input("normalize", default=True),
+                io.Enum.Input("edge_detector", ["Sobel", "Canny"], default="Sobel", optional=True),
+            ],
+            outputs=[
+                io.Float.Output("defocus_score"),
+                io.String.Output("interpretation"),
+                io.Image.Output("fft_heatmap"),
+                io.Image.Output("high_freq_mask"),
+            ]
+        )
 
     @classmethod
     def execute(cls, image, method, normalize=True, edge_detector="Sobel"):
@@ -56,7 +56,7 @@ class DefocusAnalysis(io.ComfyNode):
         fft_tensor = torch.from_numpy(cv2.cvtColor(fft_vis, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0).unsqueeze(0)
         mask_tensor = torch.from_numpy(mask_vis.astype(np.float32) / 255.0).unsqueeze(0)
 
-        return (score, interpretation, fft_tensor, mask_tensor)
+        return io.NodeOutput(score, interpretation, fft_tensor, mask_tensor)
 
     def fft_analysis(self, gray, method):
         f = np.fft.fft2(gray)

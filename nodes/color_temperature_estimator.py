@@ -4,20 +4,27 @@ import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
-import comfy.io as io
+from comfy_api.latest import io
 
 class ColorTemperatureEstimator(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({"image": io.Image.Input()})
-
-    RETURN_TYPES = ("INT", "STRING", "IMAGE")
-    RETURN_NAMES = ("kelvin", "temperature_label", "color_swatch")
-    FUNCTION = "execute"
-    CATEGORY = "Image Analysis/Color"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="Color Temperature Estimator",
+            display_name="Color Temperature Estimator",
+            category="Image Analysis/Color",
+            inputs=[
+                io.Image.Input("image"),
+            ],
+            outputs=[
+                io.Int.Output("kelvin"),
+                io.String.Output("temperature_label"),
+                io.Image.Output("color_swatch"),
+            ]
+        )
 
     @classmethod
-    def execute(cls, image):
+    def execute(cls, image) -> io.NodeOutput:
         img = image[0]
 
         # Normalize ComfyUI inputs to H×W×C float32 [0–1]
@@ -57,7 +64,7 @@ class ColorTemperatureEstimator(io.ComfyNode):
         os.unlink(tmp_path)
         swatch_tensor = torch.from_numpy(img_rgb.astype(np.float32) / 255.0).unsqueeze(0)
 
-        return kelvin, label, swatch_tensor
+        return io.NodeOutput(kelvin, label, swatch_tensor)
 
     def _estimate_color_temperature(self, img_uint8):
         img_f = img_uint8.astype(np.float32) / 255.0

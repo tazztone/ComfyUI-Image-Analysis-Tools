@@ -15,22 +15,34 @@ This document provides instructions and guidelines for working on the Image Anal
 
 This project uses the ComfyUI V3 Node Schema.
 - Nodes should inherit from `io.ComfyNode`.
-- Inputs are defined using `define_schema` class method.
+- Inputs and outputs are defined using the `define_schema` class method, which returns an `io.Schema` object.
+- The `io.Schema` contains `node_id`, `display_name`, `category`, `inputs`, and `outputs`.
 - The execution logic is in the `execute` class method.
-- Return types and names are defined in `RETURN_TYPES` and `RETURN_NAMES`.
+- Use `io.NodeOutput(...)` for return values.
 
 Example:
 ```python
-import comfy.io as io
+from comfy_api.latest import io
 
 class MyNode(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({
-            "image": io.Image.Input(),
-            # ...
-        })
-    # ...
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="MyNode",
+            display_name="My Cool Node",
+            category="Image Analysis",
+            inputs=[
+                io.Image.Input("image"),
+            ],
+            outputs=[
+                io.Image.Output("image"),
+            ]
+        )
+
+    @classmethod
+    def execute(cls, image) -> io.NodeOutput:
+        # ... logic ...
+        return io.NodeOutput(image)
 ```
 
 ### Image Data

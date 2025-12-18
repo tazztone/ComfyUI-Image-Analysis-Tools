@@ -1,21 +1,26 @@
 import numpy as np
 import cv2
 import torch
-import comfy.io as io
+from comfy_api.latest import io
 
 class SharpnessFocusScore(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({
-            "image": io.Image.Input(),
-            "method": io.Enum.Input(["Laplacian", "Tenengrad", "Hybrid"], default="Hybrid"),
-            "visualize_edges": io.Boolean.Input(default=False),
-        })
-
-    RETURN_TYPES = ("FLOAT", "IMAGE", "STRING")
-    RETURN_NAMES = ("sharpness_score", "edge_visualization", "interpretation")
-    FUNCTION = "execute"
-    CATEGORY = "Image Analysis"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="Sharpness / Focus Score",
+            display_name="Sharpness / Focus Score",
+            category="Image Analysis",
+            inputs=[
+                io.Image.Input("image"),
+                io.Enum.Input("method", ["Laplacian", "Tenengrad", "Hybrid"], default="Hybrid"),
+                io.Boolean.Input("visualize_edges", default=False),
+            ],
+            outputs=[
+                io.Float.Output("sharpness_score"),
+                io.Image.Output("edge_visualization"),
+                io.String.Output("interpretation"),
+            ]
+        )
 
     def interpret_score(self, score, method):
         if method == "Laplacian":
@@ -110,9 +115,9 @@ class SharpnessFocusScore(io.ComfyNode):
                 edge_tensor = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
             interpretation = instance.interpret_score(score, method)
-            return float(score), edge_tensor, interpretation
+            return io.NodeOutput(float(score), edge_tensor, interpretation)
 
         except Exception as e:
             print(f"[SharpnessFocusScore] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
-            return 0.0, fallback, "Error during processing"
+            return io.NodeOutput(0.0, fallback, "Error during processing")

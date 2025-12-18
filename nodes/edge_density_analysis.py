@@ -4,22 +4,28 @@ import torch
 import matplotlib.pyplot as plt
 import tempfile
 import os
-import comfy.io as io
+from comfy_api.latest import io
 
 class EdgeDensityAnalysis(io.ComfyNode):
     @classmethod
-    def define_schema(cls):
-        return io.Schema({
-            "image": io.Image.Input(),
-            "method": io.Enum.Input(["Canny", "Sobel"], default="Canny"),
-            "block_size": io.Int.Input(default=32, min=8, max=128, step=8),
-            "visualize_edge_map": io.Boolean.Input(default=True)
-        })
-
-    RETURN_TYPES = ("FLOAT", "IMAGE", "STRING", "IMAGE")
-    RETURN_NAMES = ("edge_density_score", "edge_density_map", "interpretation", "edge_preview")
-    FUNCTION = "execute"
-    CATEGORY = "Image Analysis"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="Edge Density Analysis",
+            display_name="Edge Density Analysis",
+            category="Image Analysis",
+            inputs=[
+                io.Image.Input("image"),
+                io.Enum.Input("method", ["Canny", "Sobel"], default="Canny"),
+                io.Int.Input("block_size", default=32, min=8, max=128),
+                io.Boolean.Input("visualize_edge_map", default=True)
+            ],
+            outputs=[
+                io.Float.Output("edge_density_score"),
+                io.Image.Output("edge_density_map"),
+                io.String.Output("interpretation"),
+                io.Image.Output("edge_preview")
+            ]
+        )
 
     @classmethod
     def execute(cls, image, method, block_size, visualize_edge_map):
@@ -99,9 +105,9 @@ class EdgeDensityAnalysis(io.ComfyNode):
             else:
                 map_tensor = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
-            return global_density, map_tensor, interp, edge_tensor
+            return io.NodeOutput(global_density, map_tensor, interp, edge_tensor)
 
         except Exception as e:
             print(f"[EdgeDensityAnalysis] Error: {e}")
             fallback = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
-            return 0.0, fallback, "Error during processing", fallback
+            return io.NodeOutput(0.0, fallback, "Error during processing", fallback)
