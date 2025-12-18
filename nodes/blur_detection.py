@@ -2,8 +2,8 @@ import numpy as np
 import cv2
 import torch
 import matplotlib.pyplot as plt
-import tempfile
 import os
+import io as py_io
 from comfy_api.latest import io
 
 class BlurDetection(io.ComfyNode):
@@ -25,7 +25,8 @@ class BlurDetection(io.ComfyNode):
             ]
         )
 
-    def interpret_blur(self, score):
+    @staticmethod
+    def interpret_blur(score):
         if score < 50:
             return f"Very blurry ({score:.1f})"
         elif score < 150:
@@ -72,7 +73,7 @@ class BlurDetection(io.ComfyNode):
             # Use instance method? execute is classmethod in V3 guideline,
             # so we must create instance or make helper static.
             # However, the interpret_blur method doesn't use self state.
-            interpretation = cls().interpret_blur(global_score)
+            interpretation = cls.interpret_blur(global_score)
 
             if visualize_blur_map:
                 vis_up = cv2.resize(blur_map, (w, h), interpolation=cv2.INTER_NEAREST)
@@ -88,14 +89,13 @@ class BlurDetection(io.ComfyNode):
                 cbar.ax.yaxis.set_label_position("left")
                 cbar.ax.yaxis.set_ticks_position("left")
 
-                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmpfile:
-                    plt.savefig(tmpfile.name, bbox_inches='tight', dpi=150)
-                    plt.close(fig)
-                    temp_path = tmpfile.name
-
-                blur_img = cv2.imread(temp_path)
+                buf = py_io.BytesIO()
+                plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+                plt.close(fig)
+                buf.seek(0)
+                img_array = np.frombuffer(buf.getvalue(), dtype=np.uint8)
+                blur_img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
                 blur_rgb = cv2.cvtColor(blur_img, cv2.COLOR_BGR2RGB)
-                os.unlink(temp_path)
 
                 blur_tensor = torch.from_numpy(blur_rgb.astype(np.float32) / 255.0).unsqueeze(0)
             else:

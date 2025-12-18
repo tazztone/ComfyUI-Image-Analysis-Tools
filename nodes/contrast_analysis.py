@@ -2,8 +2,8 @@ import numpy as np
 import cv2
 import torch
 import matplotlib.pyplot as plt
-import tempfile
 import os
+import io as py_io
 from comfy_api.latest import io
 
 class ContrastAnalysis(io.ComfyNode):
@@ -96,12 +96,13 @@ class ContrastAnalysis(io.ComfyNode):
             cbar.ax.yaxis.set_label_position("left")
             cbar.ax.yaxis.set_ticks_position("left")
 
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmpfile:
-                plt.savefig(tmpfile.name, bbox_inches='tight', dpi=150)
-                plt.close(fig)
-                img = cv2.imread(tmpfile.name)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                os.unlink(tmpfile.name)
+            buf = py_io.BytesIO()
+            plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+            plt.close(fig)
+            buf.seek(0)
+            img_array = np.frombuffer(buf.getvalue(), dtype=np.uint8)
+            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             tensor_img = torch.from_numpy(img.astype(np.float32) / 255.0).unsqueeze(0)
         else:
             tensor_img = torch.zeros((1, 64, 64, 3), dtype=torch.float32)

@@ -20,29 +20,28 @@ This project uses the ComfyUI V3 Node Schema.
 - The execution logic is in the `execute` class method.
 - Use `io.NodeOutput(...)` for return values.
 
-Example:
+#### V3 Anti-Patterns (CRITICAL)
+- **Do NOT instantiate the node class** inside `execute` (e.g., `instance = cls()` or `instance = MyNode()`). V3 node instances are immutable/frozen after registration. Attempting to set attributes on them will raise an `AttributeError`.
+- **Use `@staticmethod`** for all helper methods. Call them via `cls.method_name(...)` or `MyNode.method_name(...)` inside the `execute` classmethod.
+
+### File Handling & Windows Compatibility
+- **Avoid Temporary Files**: On Windows, `tempfile.NamedTemporaryFile` can cause "File in use" errors if a process (like `cv2.imread`) tries to access it while another handle is still open.
+- **Use BytesIO for Visualizations**: When generating plots with Matplotlib, save the figure to a `BytesIO` buffer instead of a file on disk.
+
+Example of safe visualization:
 ```python
-from comfy_api.latest import io
+import io as py_io
+import cv2
+import numpy as np
 
-class MyNode(io.ComfyNode):
-    @classmethod
-    def define_schema(cls) -> io.Schema:
-        return io.Schema(
-            node_id="MyNode",
-            display_name="My Cool Node",
-            category="Image Analysis",
-            inputs=[
-                io.Image.Input("image"),
-            ],
-            outputs=[
-                io.Image.Output("image"),
-            ]
-        )
-
-    @classmethod
-    def execute(cls, image) -> io.NodeOutput:
-        # ... logic ...
-        return io.NodeOutput(image)
+# ... inside execute ...
+buf = py_io.BytesIO()
+plt.savefig(buf, format='png', bbox_inches='tight')
+plt.close(fig)
+buf.seek(0)
+img_array = np.frombuffer(buf.getvalue(), dtype=np.uint8)
+img_bgr = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 ```
 
 ### Image Data
@@ -56,6 +55,7 @@ class MyNode(io.ComfyNode):
 
 - Tests are located in the `tests/` directory.
 - Run tests using: `python -m pytest`
+- **Standalone Tests**: Since ComfyUI and its venv may not be accessible, write tests that mock `comfy_api`. Test the pure Python/OpenCV logic by isolating it into static methods.
 - **Mocking `comfy`**: The `comfy` package (specifically `comfy.io`) is not available in the development environment. It is mocked in `tests/mocks/comfy` (or should be mocked if writing new tests). Ensure your tests set up `sys.path` or mocks correctly to handle `import comfy.io`.
 
 ## Dependencies

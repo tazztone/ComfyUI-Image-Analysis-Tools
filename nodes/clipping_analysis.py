@@ -2,8 +2,8 @@ import numpy as np
 import cv2
 import torch
 import matplotlib.pyplot as plt
-import tempfile
 import os
+import io as py_io
 from comfy_api.latest import io
 
 class ClippingAnalysis(io.ComfyNode):
@@ -68,12 +68,13 @@ class ClippingAnalysis(io.ComfyNode):
                 ax.imshow(mask)
                 ax.axis("off")
 
-                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmpfile:
-                    plt.savefig(tmpfile.name, bbox_inches='tight', dpi=150)
-                    plt.close(fig)
-                    map_img = cv2.imread(tmpfile.name)
-                    map_rgb = cv2.cvtColor(map_img, cv2.COLOR_BGR2RGB)
-                    os.unlink(tmpfile.name)
+                buf = py_io.BytesIO()
+                plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
+                plt.close(fig)
+                buf.seek(0)
+                img_array = np.frombuffer(buf.getvalue(), dtype=np.uint8)
+                map_img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                map_rgb = cv2.cvtColor(map_img, cv2.COLOR_BGR2RGB)
 
                 map_tensor = torch.from_numpy(map_rgb.astype(np.float32) / 255.0).unsqueeze(0)
             else:

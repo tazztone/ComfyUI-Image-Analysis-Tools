@@ -22,7 +22,8 @@ class SharpnessFocusScore(io.ComfyNode):
             ]
         )
 
-    def interpret_score(self, score, method):
+    @staticmethod
+    def interpret_score(score, method):
         if method == "Laplacian":
             if score < 100:
                 desc = "Very blurry"
@@ -90,7 +91,7 @@ class SharpnessFocusScore(io.ComfyNode):
             mag = np.sqrt(gx ** 2 + gy ** 2)
             ten_score = np.mean(mag ** 2)
 
-            instance = cls()
+            # Use static methods directly to avoid immutability issues with cls() instantiation
 
             if method == "Laplacian":
                 score = lap_score
@@ -114,7 +115,7 @@ class SharpnessFocusScore(io.ComfyNode):
             else:
                 edge_tensor = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
 
-            interpretation = instance.interpret_score(score, method)
+            interpretation = cls.interpret_score(score, method)
             return io.NodeOutput(float(score), edge_tensor, interpretation)
 
         except Exception as e:
